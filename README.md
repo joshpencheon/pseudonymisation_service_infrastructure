@@ -33,10 +33,10 @@ terraform workspace select master
 terraform apply
 ```
 
-The application is currently exposed via a `NodePort` Service; if using minikube, `minikube service list` would give a host IP.
+Once you've got DNS resolution working (see Gotcha below), Ingress makes each deployed branch available on a different subdomain:
 
-```bash
-curl -sH "Authorization: Bearer test_user:..." http://192.168.64.2:32353/api/v1/keys
+```
+curl -sH "Authorization: Bearer test_user:..." <branch_name>.pseudonymise.test/api/v1/keys
 ```
 
 ## Gotchas
@@ -52,11 +52,7 @@ Export a token (read-only is fine) as `$GITHUB_TOKEN` before running any Terrafo
 
 The behaviour of this repository is to have a Terraform workspace per development branch, and to deploy
 each into a separate k8s namespace. Ingress is then used to make each accessible on separate subdomains,
-via Host-based routing:
-
-```
-curl <branch_name>.pseudonymise.test/api/v1/keys
-```
+via Host-based routing.
 
 In order for this to work, these domains must resolve. When using Minikube / `ingress-nginx`, they must
 resolve to the Minikube VM's IP (accessible via `minikube ip`).
