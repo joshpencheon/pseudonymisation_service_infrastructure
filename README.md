@@ -2,6 +2,44 @@
 
 This repository contains proof-of-concept code for deploying NDR's [pseudonymisation service](https://github.com/joshpencheon/pseudonymisation_service) to a Kubernetes cluster, using Terraform.
 
+## Usage
+
+It's possible to deploy to a Kuberenetes cluster, using Terraform. Workspaces are use to track a per-branch state.
+
+Setup:
+
+```bash
+cd tf
+terraform init
+```
+
+Deploying `master`:
+
+```bash
+terraform workspace new master
+terraform apply
+```
+
+Then deploying a new `feature-branch`:
+
+```bash
+terraform workspace new feature-branch
+terraform apply
+```
+
+The re-deploying some updates to `master`:
+
+```bash
+terraform workspace select master
+terraform apply
+```
+
+The application is currently exposed via a `NodePort` Service; if using minikube, `minikube service list` would give a host IP.
+
+```bash
+curl -sH "Authorization: Bearer test_user:..." http://192.168.64.2:32353/api/v1/keys
+```
+
 ## Gotchas
 
 ### GitHub API access
@@ -44,3 +82,7 @@ dig wibble.pseudonymise.test @127.0.0.1
 
 ping wibble.pseudonymise.test
 ```
+
+## TODO
+
+-[] validate image label using docker provider?
