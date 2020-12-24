@@ -9,7 +9,6 @@ It's possible to deploy to a Kuberenetes cluster, using Terraform. Workspaces ar
 Setup:
 
 ```bash
-cd tf
 terraform init
 ```
 
