@@ -1,3 +1,3 @@
-output "webapp_service" {
-  value = kubernetes_service.webapp
+output "webapp_ingress" {
+  value = kubernetes_ingress.webapp
 }
