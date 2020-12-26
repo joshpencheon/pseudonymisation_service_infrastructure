@@ -76,6 +76,21 @@ resource "kubernetes_service" "postgres" {
   }
 }
 
+resource "kubernetes_config_map" "webapp" {
+  metadata {
+    name = "webapp-config"
+    namespace = kubernetes_namespace.pseudonymisation_service.id
+  }
+
+  data = {
+    "DATABASE_HOST"       = "db"
+    "DATABASE_USERNAME"   = "postgres"
+    "DATABASE_PASSWORD"   = "password"
+    "RAILS_ENV"           = "production"
+    "RAILS_LOG_TO_STDOUT" = "enabled"
+  }
+}
+
 resource "kubernetes_deployment" "webapp" {
   metadata {
     name = "webapp"
@@ -107,29 +122,10 @@ resource "kubernetes_deployment" "webapp" {
             container_port = 80
           }
 
-          env {
-            name = "DATABASE_HOST"
-            value = "db"
-          }
-
-          env {
-            name = "DATABASE_USERNAME"
-            value = "postgres"
-          }
-
-          env {
-            name = "DATABASE_PASSWORD"
-            value = "password"
-          }
-
-          env {
-            name = "RAILS_ENV"
-            value = "production"
-          }
-
-          env {
-            name = "RAILS_LOG_TO_STDOUT"
-            value = "enabled"
+          env_from {
+            config_map_ref {
+              name = kubernetes_config_map.webapp.metadata[0].name
+            }
           }
 
           lifecycle {
