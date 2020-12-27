@@ -80,5 +80,6 @@ ping wibble.pseudonymise.test
 
 ## TODO
 
-- [ ] PVC for PG
+- [x] PVC for PG
 - [ ] Secrets
+- [ ] Integration healthchecks
