@@ -80,4 +80,5 @@ ping wibble.pseudonymise.test
 
 ## TODO
 
--[] validate image label using docker provider?
+- [ ] PVC for PG
+- [ ] Secrets

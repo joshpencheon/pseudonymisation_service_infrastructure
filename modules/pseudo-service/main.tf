@@ -4,6 +4,28 @@ resource "kubernetes_namespace" "pseudonymisation_service" {
   }
 }
 
+resource "kubernetes_persistent_volume_claim" "postgres" {
+  metadata {
+    name = "postgres-data-volume-claim"
+    namespace = kubernetes_namespace.pseudonymisation_service.id
+  }
+
+  spec {
+    access_modes = ["ReadWriteOnce"]
+
+    # Using Rancher's local-path-provisioner (on k3s):
+    storage_class_name = "local-path"
+
+    resources {
+      requests = {
+        storage = "500M"
+      }
+    }
+  }
+
+  wait_until_bound = false
+}
+
 resource "kubernetes_deployment" "postgres" {
   metadata {
     name = "postgres"
@@ -49,6 +71,18 @@ resource "kubernetes_deployment" "postgres" {
               cpu    = "250m"
               memory = "50Mi"
             }
+          }
+
+          volume_mount {
+            name = "pg-data-vol"
+            mount_path = "/var/lib/postgresql/data"
+          }
+        }
+
+        volume {
+          name = "pg-data-vol"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.postgres.metadata[0].name
           }
         }
       }
