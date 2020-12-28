@@ -162,6 +162,20 @@ resource "kubernetes_deployment" "webapp" {
             }
           }
 
+          readiness_probe {
+            http_get {
+              path = "/health"
+              port = 3000
+            }
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/health"
+              port = 3000
+            }
+          }
+
           lifecycle {
             post_start {
               exec {

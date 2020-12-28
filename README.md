@@ -82,4 +82,4 @@ ping wibble.pseudonymise.test
 
 - [x] PVC for PG
 - [ ] Secrets
-- [ ] Integration healthchecks
+- [x] Integration healthchecks
