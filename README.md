@@ -82,4 +82,6 @@ ping wibble.pseudonymise.test
 
 - [x] PVC for PG
 - [ ] Secrets
+- [ ] Shared monitoring
+- [ ] Shared DB option
 - [x] Integration healthchecks
