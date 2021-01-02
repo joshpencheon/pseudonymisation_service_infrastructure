@@ -50,7 +50,7 @@ resource "kubernetes_deployment" "postgres" {
       }
       spec {
         container {
-          image = "postgres"
+          image = "postgres:alpine"
           name  = "db"
 
           port {
