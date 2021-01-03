@@ -85,3 +85,4 @@ ping wibble.pseudonymise.test
 - [ ] Shared monitoring
 - [ ] Shared DB option
 - [x] Integration healthchecks
+- [ ] `NetworkPolicy` for Ingress/Egress filtering
