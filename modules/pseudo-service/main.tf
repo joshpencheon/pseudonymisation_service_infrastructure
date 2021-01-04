@@ -1,6 +1,9 @@
 resource "kubernetes_namespace" "pseudonymisation_service" {
   metadata {
     name = "pseudonymisation-service-${var.label}"
+    labels = {
+      app = "pseudonymisation-service"
+    }
   }
 }
 
@@ -8,6 +11,9 @@ resource "kubernetes_persistent_volume_claim" "postgres" {
   metadata {
     name = "postgres-data-volume-claim"
     namespace = kubernetes_namespace.pseudonymisation_service.id
+    labels = {
+      app = "pseudonymisation-service"
+    }
   }
 
   spec {
@@ -31,7 +37,8 @@ resource "kubernetes_deployment" "postgres" {
     name = "postgres"
     namespace = kubernetes_namespace.pseudonymisation_service.id
     labels = {
-      app = "pseudo-db"
+      app = "pseudonymisation-service"
+      role = "db"
     }
   }
 
@@ -39,13 +46,15 @@ resource "kubernetes_deployment" "postgres" {
     replicas = 1
     selector {
       match_labels = {
-        app = "pseudo-db"
+        app = "pseudonymisation-service"
+        role = "db"
       }
     }
     template {
       metadata {
         labels = {
-          app = "pseudo-db"
+          app = "pseudonymisation-service"
+          role = "db"
         }
       }
       spec {
@@ -95,11 +104,15 @@ resource "kubernetes_service" "postgres" {
   metadata {
     name = "db"
     namespace = kubernetes_namespace.pseudonymisation_service.id
+    labels = {
+      app = "pseudonymisation-service"
+    }
   }
 
   spec {
     selector = {
-      app = kubernetes_deployment.postgres.metadata[0].labels.app
+      app  = kubernetes_deployment.postgres.metadata[0].labels.app
+      role = kubernetes_deployment.postgres.metadata[0].labels.role
     }
 
     port {
@@ -114,6 +127,9 @@ resource "kubernetes_config_map" "webapp" {
   metadata {
     name = "webapp-config"
     namespace = kubernetes_namespace.pseudonymisation_service.id
+    labels = {
+      app = "pseudonymisation-service"
+    }
   }
 
   data = {
@@ -130,7 +146,8 @@ resource "kubernetes_deployment" "webapp" {
     name = "webapp"
     namespace = kubernetes_namespace.pseudonymisation_service.id
     labels = {
-      app = "pseudo-app"
+      app = "pseudonymisation-service"
+      role = "web"
     }
   }
 
@@ -138,13 +155,15 @@ resource "kubernetes_deployment" "webapp" {
     replicas = 1
     selector {
       match_labels = {
-        app = "pseudo-app"
+        app = "pseudonymisation-service"
+        role = "web"
       }
     }
     template {
       metadata {
         labels = {
-          app = "pseudo-app"
+          app = "pseudonymisation-service"
+          role = "web"
         }
       }
       spec {
@@ -209,11 +228,15 @@ resource "kubernetes_service" "webapp" {
   metadata {
     name = "webapp"
     namespace = kubernetes_namespace.pseudonymisation_service.id
+    labels = {
+      app = "pseudonymisation-service"
+    }
   }
 
   spec {
     selector = {
-      app = kubernetes_deployment.webapp.metadata[0].labels.app
+      app  = kubernetes_deployment.webapp.metadata[0].labels.app
+      role = kubernetes_deployment.webapp.metadata[0].labels.role
     }
 
     port {
@@ -229,6 +252,9 @@ resource "kubernetes_ingress" "webapp" {
   metadata {
     name = "webapp"
     namespace = kubernetes_namespace.pseudonymisation_service.id
+    labels = {
+      app = "pseudonymisation-service"
+    }
   }
 
   spec {
