@@ -38,7 +38,7 @@ resource "kubernetes_deployment" "postgres" {
     namespace = kubernetes_namespace.pseudonymisation_service.id
     labels = {
       app = "pseudonymisation-service"
-      role = "db"
+      tier = "db"
     }
   }
 
@@ -47,14 +47,14 @@ resource "kubernetes_deployment" "postgres" {
     selector {
       match_labels = {
         app = "pseudonymisation-service"
-        role = "db"
+        tier = "db"
       }
     }
     template {
       metadata {
         labels = {
           app = "pseudonymisation-service"
-          role = "db"
+          tier = "db"
         }
       }
       spec {
@@ -99,6 +99,43 @@ resource "kubernetes_deployment" "postgres" {
   }
 }
 
+resource "kubernetes_network_policy" "pseudonymisation_service_postgres_policy" {
+  metadata {
+    name = "pseudonymisation-service-postgres-policy"
+    namespace = kubernetes_namespace.pseudonymisation_service.id
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        app  = kubernetes_deployment.postgres.metadata[0].labels.app
+        tier = kubernetes_deployment.postgres.metadata[0].labels.tier
+      }
+    }
+
+    # Allow PG connections in only from the webapp:
+    ingress {
+      ports {
+        port     = "5432"
+        protocol = "TCP"
+      }
+
+      from {
+        pod_selector {
+          match_labels = {
+            app  = kubernetes_deployment.webapp.metadata[0].labels.app
+            tier = kubernetes_deployment.webapp.metadata[0].labels.tier
+          }
+        }
+      }
+    }
+
+    # No Egress allowlist at all => no connections out.
+    # egress {}
+
+    policy_types = ["Ingress", "Egress"]
+  }
+}
 
 resource "kubernetes_service" "postgres" {
   metadata {
@@ -112,7 +149,7 @@ resource "kubernetes_service" "postgres" {
   spec {
     selector = {
       app  = kubernetes_deployment.postgres.metadata[0].labels.app
-      role = kubernetes_deployment.postgres.metadata[0].labels.role
+      tier = kubernetes_deployment.postgres.metadata[0].labels.tier
     }
 
     port {
@@ -147,7 +184,7 @@ resource "kubernetes_deployment" "webapp" {
     namespace = kubernetes_namespace.pseudonymisation_service.id
     labels = {
       app = "pseudonymisation-service"
-      role = "web"
+      tier = "web"
     }
   }
 
@@ -156,14 +193,14 @@ resource "kubernetes_deployment" "webapp" {
     selector {
       match_labels = {
         app = "pseudonymisation-service"
-        role = "web"
+        tier = "web"
       }
     }
     template {
       metadata {
         labels = {
           app = "pseudonymisation-service"
-          role = "web"
+          tier = "web"
         }
       }
       spec {
@@ -223,6 +260,53 @@ resource "kubernetes_deployment" "webapp" {
   }
 }
 
+resource "kubernetes_network_policy" "pseudonymisation_service_web_policy" {
+  metadata {
+    name = "pseudonymisation-service-web-policy"
+    namespace = kubernetes_namespace.pseudonymisation_service.id
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        app  = kubernetes_deployment.webapp.metadata[0].labels.app
+        tier = kubernetes_deployment.webapp.metadata[0].labels.tier
+      }
+    }
+
+    # Allow connections out the the DB:
+    egress {
+      ports {
+        port     = "5432"
+        protocol = "TCP"
+      }
+
+      to {
+        pod_selector {
+          match_labels = {
+            app  = kubernetes_deployment.postgres.metadata[0].labels.app
+            tier = kubernetes_deployment.postgres.metadata[0].labels.tier
+          }
+        }
+      }
+    }
+
+    # Allow connections to DNS (and anything else on :53):
+    egress {
+      ports {
+        port     = "53"
+        protocol = "TCP"
+      }
+
+      ports {
+        port     = "53"
+        protocol = "UDP"
+      }
+    }
+
+    policy_types = ["Egress"]
+  }
+}
 
 resource "kubernetes_service" "webapp" {
   metadata {
@@ -236,7 +320,7 @@ resource "kubernetes_service" "webapp" {
   spec {
     selector = {
       app  = kubernetes_deployment.webapp.metadata[0].labels.app
-      role = kubernetes_deployment.webapp.metadata[0].labels.role
+      tier = kubernetes_deployment.webapp.metadata[0].labels.tier
     }
 
     port {
