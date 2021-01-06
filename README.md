@@ -83,6 +83,7 @@ ping wibble.pseudonymise.test
 - [x] PVC for PG
 - [ ] Secrets
 - [ ] Shared monitoring
+- [ ] Shared logging
 - [ ] Shared DB option
 - [x] Integration healthchecks
 - [x] `NetworkPolicy` for Ingress/Egress filtering
