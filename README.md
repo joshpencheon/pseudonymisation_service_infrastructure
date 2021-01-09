@@ -6,9 +6,18 @@ This repository contains proof-of-concept code for deploying NDR's [pseudonymisa
 
 It's possible to deploy to a Kuberenetes cluster, using Terraform. Workspaces are use to track a per-branch state.
 
-Setup:
+Setup shared env:
 
 ```bash
+cd shared
+terraform init
+terraform apply
+```
+
+Setup per-branch env:
+
+```bash
+cd app_branches
 terraform init
 ```
 
@@ -35,8 +44,22 @@ terraform apply
 
 Once you've got DNS resolution working (see Gotcha below), Ingress makes each deployed branch available on a different subdomain:
 
-```
+```bash
 curl -sH "Authorization: Bearer test_user:..." <branch_name>.pseudonymise.test/api/v1/keys
+```
+
+## Configuration
+
+Deploy connected to a shared database (e.g. staging), rather than a branch-specific instance:
+
+```bash
+terraform apply -var 'use_shared_db=true'
+```
+
+Deploy a specific revision, rather than the default of the branch's current HEAD:
+
+```bash
+terraform apply -var 'release_tag=8ab542052a4e9ff0496bb4940f837f13c56d960e'
 ```
 
 ## Gotchas
@@ -84,6 +107,6 @@ ping wibble.pseudonymise.test
 - [ ] Secrets
 - [ ] Shared monitoring
 - [ ] Shared logging
-- [ ] Shared DB option
+- [x] Shared DB option
 - [x] Integration healthchecks
 - [x] `NetworkPolicy` for Ingress/Egress filtering

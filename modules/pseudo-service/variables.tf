@@ -5,3 +5,7 @@ variable "release_tag" {
 variable "label" {
   type    = string
 }
+
+variable "use_shared_db" {
+  type    = bool
+}

@@ -2,12 +2,28 @@ resource "kubernetes_namespace" "pseudonymisation_service" {
   metadata {
     name = "pseudonymisation-service-${var.label}"
     labels = {
-      app = "pseudonymisation-service"
+      app  = "pseudonymisation-service"
+      role = "deployment"
     }
   }
 }
 
+data "terraform_remote_state" "shared" {
+  backend = "local"
+
+  config = {
+    path = "../shared/terraform.tfstate"
+  }
+}
+
+locals {
+  shared_namespace = data.terraform_remote_state.shared.outputs.shared_namespace
+  shared_postgres_service = data.terraform_remote_state.shared.outputs.shared_postgres_service
+}
+
 resource "kubernetes_persistent_volume_claim" "postgres" {
+  count = var.use_shared_db ? 0 : 1
+
   metadata {
     name = "postgres-data-volume-claim"
     namespace = kubernetes_namespace.pseudonymisation_service.id
@@ -33,6 +49,8 @@ resource "kubernetes_persistent_volume_claim" "postgres" {
 }
 
 resource "kubernetes_deployment" "postgres" {
+  count = var.use_shared_db ? 0 : 1
+
   metadata {
     name = "postgres"
     namespace = kubernetes_namespace.pseudonymisation_service.id
@@ -91,7 +109,7 @@ resource "kubernetes_deployment" "postgres" {
         volume {
           name = "pg-data-vol"
           persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.postgres.metadata[0].name
+            claim_name = kubernetes_persistent_volume_claim.postgres[0].metadata[0].name
           }
         }
       }
@@ -100,6 +118,8 @@ resource "kubernetes_deployment" "postgres" {
 }
 
 resource "kubernetes_network_policy" "pseudonymisation_service_postgres_policy" {
+  count = var.use_shared_db ? 0 : 1
+
   metadata {
     name = "pseudonymisation-service-postgres-policy"
     namespace = kubernetes_namespace.pseudonymisation_service.id
@@ -108,8 +128,8 @@ resource "kubernetes_network_policy" "pseudonymisation_service_postgres_policy" 
   spec {
     pod_selector {
       match_labels = {
-        app  = kubernetes_deployment.postgres.metadata[0].labels.app
-        tier = kubernetes_deployment.postgres.metadata[0].labels.tier
+        app  = kubernetes_deployment.postgres[0].metadata[0].labels.app
+        tier = kubernetes_deployment.postgres[0].metadata[0].labels.tier
       }
     }
 
@@ -138,6 +158,8 @@ resource "kubernetes_network_policy" "pseudonymisation_service_postgres_policy" 
 }
 
 resource "kubernetes_service" "postgres" {
+  count = var.use_shared_db ? 0 : 1
+
   metadata {
     name = "db"
     namespace = kubernetes_namespace.pseudonymisation_service.id
@@ -148,8 +170,8 @@ resource "kubernetes_service" "postgres" {
 
   spec {
     selector = {
-      app  = kubernetes_deployment.postgres.metadata[0].labels.app
-      tier = kubernetes_deployment.postgres.metadata[0].labels.tier
+      app  = kubernetes_deployment.postgres[0].metadata[0].labels.app
+      tier = kubernetes_deployment.postgres[0].metadata[0].labels.tier
     }
 
     port {
@@ -170,7 +192,7 @@ resource "kubernetes_config_map" "webapp" {
   }
 
   data = {
-    "DATABASE_HOST"       = "db"
+    "DATABASE_HOST"       = var.use_shared_db ? "${local.shared_postgres_service.metadata[0].name}.${local.shared_postgres_service.metadata[0].namespace}" : kubernetes_service.postgres[0].metadata[0].name
     "DATABASE_USERNAME"   = "postgres"
     "DATABASE_PASSWORD"   = "password"
     "RAILS_ENV"           = "production"
@@ -201,6 +223,11 @@ resource "kubernetes_deployment" "webapp" {
         labels = {
           app = "pseudonymisation-service"
           tier = "web"
+        }
+        annotations = {
+          # Annotate the template with the version of the config that gets
+          # injected, so Terraform can re-deploy following a config change
+          config_change = sha1(jsonencode(kubernetes_config_map.webapp.data))
         }
       }
       spec {
@@ -258,11 +285,46 @@ resource "kubernetes_deployment" "webapp" {
       }
     }
   }
+
+  wait_for_rollout = false
 }
 
-resource "kubernetes_network_policy" "pseudonymisation_service_web_policy" {
+resource "kubernetes_network_policy" "pseudonymisation_service_web_dns_policy" {
   metadata {
-    name = "pseudonymisation-service-web-policy"
+    name = "pseudonymisation-service-web-dns-policy"
+    namespace = kubernetes_namespace.pseudonymisation_service.id
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        app  = kubernetes_deployment.webapp.metadata[0].labels.app
+        tier = kubernetes_deployment.webapp.metadata[0].labels.tier
+      }
+    }
+
+    # Allow connections to DNS (and anything else on :53):
+    egress {
+      ports {
+        port     = "53"
+        protocol = "TCP"
+      }
+
+      ports {
+        port     = "53"
+        protocol = "UDP"
+      }
+    }
+
+    policy_types = ["Egress"]
+  }
+}
+
+resource "kubernetes_network_policy" "pseudonymisation_service_web_dedicated_db_policy" {
+  count = var.use_shared_db ? 0 : 1
+
+  metadata {
+    name = "pseudonymisation-service-web-db-policy"
     namespace = kubernetes_namespace.pseudonymisation_service.id
   }
 
@@ -284,23 +346,47 @@ resource "kubernetes_network_policy" "pseudonymisation_service_web_policy" {
       to {
         pod_selector {
           match_labels = {
-            app  = kubernetes_deployment.postgres.metadata[0].labels.app
-            tier = kubernetes_deployment.postgres.metadata[0].labels.tier
+            app  = kubernetes_deployment.postgres[0].metadata[0].labels.app
+            tier = kubernetes_deployment.postgres[0].metadata[0].labels.tier
           }
         }
       }
     }
 
-    # Allow connections to DNS (and anything else on :53):
+    policy_types = ["Egress"]
+  }
+}
+
+resource "kubernetes_network_policy" "pseudonymisation_service_web_shared_db_policy" {
+  count = var.use_shared_db ? 1 : 0
+
+  metadata {
+    name = "pseudonymisation-service-web-db-policy"
+    namespace = kubernetes_namespace.pseudonymisation_service.id
+  }
+
+  spec {
+    pod_selector {
+      match_labels = {
+        app  = kubernetes_deployment.webapp.metadata[0].labels.app
+        tier = kubernetes_deployment.webapp.metadata[0].labels.tier
+      }
+    }
+
+    # Allow PG connections out to the namespace that holds the shared DB:
     egress {
       ports {
-        port     = "53"
+        port     = "5432"
         protocol = "TCP"
       }
 
-      ports {
-        port     = "53"
-        protocol = "UDP"
+      to {
+        namespace_selector {
+          match_labels = {
+            app = local.shared_namespace.metadata[0].labels.app
+            role = local.shared_namespace.metadata[0].labels.role
+          }
+        }
       }
     }
 

@@ -30,6 +30,7 @@ data "github_branch" "current" {
 module "pseudo_service" {
   source = "./../modules/pseudo-service"
 
-  label       = local.branch
-  release_tag = local.release_tag
+  label         = local.branch
+  release_tag   = local.release_tag
+  use_shared_db = var.use_shared_db
 }
