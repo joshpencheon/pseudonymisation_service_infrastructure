@@ -28,7 +28,7 @@ data "github_branch" "current" {
 }
 
 module "pseudo_service" {
-  source = "./modules/pseudo-service"
+  source = "./../modules/pseudo-service"
 
   label       = local.branch
   release_tag = local.release_tag
